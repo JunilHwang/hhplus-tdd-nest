@@ -24,9 +24,8 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
-      "prettier --write",
-      "eslint --fix",
-      "tsc:ci"
+      "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+      "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
     ]
   },
   "dependencies": {
