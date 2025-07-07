@@ -3,6 +3,8 @@ import { PointController } from '../point.controller';
 import { UserPointTable } from '../../database/userpoint.table';
 import { PointHistoryTable } from '../../database/pointhistory.table';
 import { PointBody } from '../point.dto';
+import { PointService } from '../point.service';
+import { PointException } from '../point.error';
 
 /**
  * 포인트 관련 API 명세
@@ -14,18 +16,14 @@ import { PointBody } from '../point.dto';
  */
 describe('PointController > ', () => {
   let controller: PointController;
-  let userPointTable: UserPointTable;
-  let pointHistoryTable: PointHistoryTable;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PointController],
-      providers: [UserPointTable, PointHistoryTable],
+      providers: [PointService, UserPointTable, PointHistoryTable],
     }).compile();
 
     controller = module.get<PointController>(PointController);
-    userPointTable = module.get<UserPointTable>(UserPointTable);
-    pointHistoryTable = module.get<PointHistoryTable>(PointHistoryTable);
   });
 
   describe('포인트 충전', () => {
@@ -41,9 +39,9 @@ describe('PointController > ', () => {
       const point = new PointBody();
       point.amount = amount as never;
 
-      expect(() => {
-        controller.charge(userId, point);
-      }).toThrow();
+      await expect(controller.charge(userId, point)).rejects.toThrow(
+        new PointException('충전 금액은 양의 정수여야 합니다.'),
+      );
     });
   });
 
