@@ -199,4 +199,26 @@ describe('PointController > ', () => {
       ]);
     });
   });
+
+  describe('동일한 유저가 포인트 충전을 한 번에 여러 번 하는 경우', () => {
+    test('충전 요청이 순차적으로 처리되어야 한다', async () => {
+      const point1 = createPointBody(1000);
+      const point2 = createPointBody(2000);
+
+      const charge1 = controller.charge(USER_ID, point1);
+      const charge2 = controller.charge(USER_ID, point2);
+
+      await expect(charge1).resolves.toEqual({
+        id: USER_ID,
+        point: 1000,
+        updateMillis: expect.any(Number),
+      });
+
+      await expect(charge2).resolves.toEqual({
+        id: USER_ID,
+        point: 3000,
+        updateMillis: expect.any(Number),
+      });
+    });
+  });
 });
