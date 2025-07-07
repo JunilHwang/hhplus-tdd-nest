@@ -6,6 +6,8 @@ import { PointBody } from '../point.dto';
 import { PointService } from '../point.service';
 import { PointException } from '../point.error';
 
+const USER_ID = 1;
+
 /**
  * 포인트 관련 API 명세
  * - PATCH  `/point/{id}/charge` : 포인트를 충전한다.
@@ -14,8 +16,10 @@ import { PointException } from '../point.error';
  * - GET `/point/{id}/histories` : 포인트 내역을 조회한다.
  * - 잔고가 부족할 경우, 포인트 사용은 실패하여야 합니다.
  */
+
 describe('PointController > ', () => {
   let controller: PointController;
+  let userPointTable: UserPointTable;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -23,31 +27,74 @@ describe('PointController > ', () => {
       providers: [PointService, UserPointTable, PointHistoryTable],
     }).compile();
 
-    controller = module.get<PointController>(PointController);
+    controller = module.get(PointController);
+    userPointTable = module.get(UserPointTable);
   });
 
   describe('포인트 충전', () => {
     test.each([
-      ['음수 금액', -1000],
-      ['0원', 0],
-      ['소수점 금액', -0.5],
-      ['문자열 금액', 'abc'],
-      ['null 금액', null],
-      ['undefined 금액', undefined],
-    ])('%s으로 충전을 시도하면 실패한다', async (_, amount) => {
-      const userId = 1;
+      { amount: -1000 },
+      { amount: 0 },
+      { amount: 0.1 },
+      { amount: -0.5 },
+      { amount: 'abc' },
+      { amount: null },
+      { amount: undefined },
+      { amount: [] },
+      { amount: {} },
+      { amount: NaN },
+    ])('$amount 로 충전을 시도하면 실패한다', async ({ amount }) => {
       const point = new PointBody();
       point.amount = amount as never;
 
-      await expect(controller.charge(userId, point)).rejects.toThrow(
+      await expect(controller.charge(USER_ID, point)).rejects.toThrow(
         new PointException('충전 금액은 양의 정수여야 합니다.'),
       );
+    });
+
+    test.each([
+      { name: '정수 금액', amount: 1000 },
+      { name: '최대 정수 금액', amount: Number.MAX_SAFE_INTEGER },
+      { name: '최소 양의 정수 금액', amount: 1 },
+    ])(
+      '양의 정수 $amount 으로 충전을 시도하면 성공한다',
+      async ({ amount }) => {
+        const point = new PointBody();
+        point.amount = amount;
+
+        expect(await controller.charge(USER_ID, point)).toEqual({
+          id: USER_ID,
+          point: amount,
+          updateMillis: expect.any(Number),
+        });
+      },
+    );
+  });
+
+  describe('포인트 조회 > 유저 1의 포인트를 1000만큼 충전했을 때', () => {
+    beforeEach(async () => {
+      // USER_ID 유저의 포인트를 추가함
+      await userPointTable.insertOrUpdate(USER_ID, 1000);
+    });
+
+    test('유저 2는 포인트가 업식 때문에 0으로 조회된다.', async () => {
+      expect(await controller.point(2)).toEqual({
+        id: 2,
+        point: 0,
+        updateMillis: expect.any(Number),
+      });
+    });
+
+    test('유저 1의 포인트는 1000으로 조회된다.', async () => {
+      expect(await controller.point(USER_ID)).toEqual({
+        id: USER_ID,
+        point: 1000,
+        updateMillis: expect.any(Number),
+      });
     });
   });
 
   describe('포인트 사용', () => {});
-
-  describe('포인트 조회', () => {});
 
   describe('포인트 내역 조회', () => {});
 
