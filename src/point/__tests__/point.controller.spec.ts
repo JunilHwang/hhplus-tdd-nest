@@ -94,7 +94,40 @@ describe('PointController > ', () => {
     });
   });
 
-  describe('포인트 사용', () => {});
+  describe('포인트 사용', () => {
+    test('포인트 사용 시, 잔고가 부족하면 실패한다', async () => {
+      const point = new PointBody();
+      point.amount = 1000;
+
+      const userPoint = await userPointTable.selectById(USER_ID);
+
+      expect(userPoint.point).toBe(0);
+
+      await expect(controller.use(USER_ID, point)).rejects.toThrow(
+        new PointException('잔고가 부족합니다.'),
+      );
+    });
+
+    test('포인트 사용 시, 잔고가 충분하면 성공한다', async () => {
+      // USER_ID 유저의 포인트를 1000으로 설정
+      await userPointTable.insertOrUpdate(USER_ID, 1000);
+
+      const point = new PointBody();
+      point.amount = 500;
+
+      expect(await controller.use(USER_ID, point)).toEqual({
+        id: USER_ID,
+        point: 500,
+        updateMillis: expect.any(Number),
+      });
+
+      expect(await controller.use(USER_ID, point)).toEqual({
+        id: USER_ID,
+        point: 0,
+        updateMillis: expect.any(Number),
+      });
+    });
+  });
 
   describe('포인트 내역 조회', () => {});
 
