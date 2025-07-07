@@ -8,6 +8,7 @@ import {
   InsufficientPointException,
   InvalidPointRequestException,
 } from '../point.error';
+import { TransactionType } from '../point.model';
 
 const USER_ID = 1;
 
@@ -149,7 +150,45 @@ describe('PointController > ', () => {
     });
   });
 
-  describe('포인트 내역 조회', () => {});
+  describe('포인트 내역 조회', () => {
+    test('포인트 내역이 없는 경우 빈 배열을 반환한다', async () => {
+      expect(await controller.history(USER_ID)).toEqual([]);
+    });
+
+    test('포인트 내역이 있는 경우 해당 내역을 반환한다', async () => {
+      // 포인트 내역을 추가
+      const pointHistoryTable = new PointHistoryTable();
+      await pointHistoryTable.insert(
+        USER_ID,
+        1000,
+        TransactionType.CHARGE,
+        Date.now(),
+      );
+      await pointHistoryTable.insert(
+        USER_ID,
+        -500,
+        TransactionType.USE,
+        Date.now(),
+      );
+
+      const histories = await controller.history(USER_ID);
+      expect(histories).toHaveLength(2);
+      expect(histories[0]).toEqual({
+        id: expect.any(Number),
+        userId: USER_ID,
+        amount: 1000,
+        type: 'charge',
+        timeMillis: expect.any(Number),
+      });
+      expect(histories[1]).toEqual({
+        id: expect.any(Number),
+        userId: USER_ID,
+        amount: -500,
+        type: 'use',
+        timeMillis: expect.any(Number),
+      });
+    });
+  });
 
   describe('잔고가 관리', () => {});
 });
