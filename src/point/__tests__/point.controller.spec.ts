@@ -4,7 +4,10 @@ import { UserPointTable } from '../../database/userpoint.table';
 import { PointHistoryTable } from '../../database/pointhistory.table';
 import { PointBody } from '../point.dto';
 import { PointService } from '../point.service';
-import { PointException } from '../point.error';
+import {
+  InsufficientPointException,
+  InvalidPointRequestException,
+} from '../point.error';
 
 const USER_ID = 1;
 
@@ -53,7 +56,7 @@ describe('PointController > ', () => {
       const point = createPointBody(amount as never);
 
       await expect(controller.charge(USER_ID, point)).rejects.toThrow(
-        new PointException('충전 금액은 양의 정수여야 합니다.'),
+        new InvalidPointRequestException('충전 금액은 양의 정수여야 합니다.'),
       );
     });
 
@@ -108,12 +111,8 @@ describe('PointController > ', () => {
         await userPointTable.insertOrUpdate(USER_ID, amount);
         const point = createPointBody(usePoint);
 
-        const userPoint = await userPointTable.selectById(USER_ID);
-
-        expect(userPoint.point).toBe(0);
-
         await expect(controller.use(USER_ID, point)).rejects.toThrow(
-          new PointException('잔고가 부족합니다.'),
+          new InsufficientPointException('잔고가 부족합니다.'),
         );
       },
     );
@@ -125,7 +124,7 @@ describe('PointController > ', () => {
         const point = createPointBody(usePoint as never);
 
         await expect(controller.use(USER_ID, point)).rejects.toThrow(
-          new PointException('잔고가 부족합니다.'),
+          new InvalidPointRequestException('사용 금액은 양의 정수여야 합니다.'),
         );
       },
     );
