@@ -51,8 +51,8 @@ export class PointController {
     @Param('id') id,
     @Body(ValidationPipe) pointDto: PointDto,
   ): Promise<UserPoint> {
-    const userId = Number.parseInt(id);
+    const userId = parseInt(id);
     const amount = pointDto.amount;
-    return { id: userId, point: amount, updateMillis: Date.now() };
+    return await this.pointService.usePoint(userId, amount);
   }
 }
