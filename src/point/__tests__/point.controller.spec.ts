@@ -8,6 +8,12 @@ import { PointException } from '../point.error';
 
 const USER_ID = 1;
 
+const createPointBody = (amount: number): PointBody => {
+  const point = new PointBody();
+  point.amount = amount;
+  return point;
+};
+
 /**
  * 포인트 관련 API 명세
  * - PATCH  `/point/{id}/charge` : 포인트를 충전한다.
@@ -44,8 +50,7 @@ describe('PointController > ', () => {
       { amount: {} },
       { amount: NaN },
     ])('$amount 로 충전을 시도하면 실패한다', async ({ amount }) => {
-      const point = new PointBody();
-      point.amount = amount as never;
+      const point = createPointBody(amount as never);
 
       await expect(controller.charge(USER_ID, point)).rejects.toThrow(
         new PointException('충전 금액은 양의 정수여야 합니다.'),
@@ -59,8 +64,7 @@ describe('PointController > ', () => {
     ])(
       '양의 정수 $amount 으로 충전을 시도하면 성공한다',
       async ({ amount }) => {
-        const point = new PointBody();
-        point.amount = amount;
+        const point = createPointBody(amount);
 
         expect(await controller.charge(USER_ID, point)).toEqual({
           id: USER_ID,
@@ -95,25 +99,42 @@ describe('PointController > ', () => {
   });
 
   describe('포인트 사용', () => {
-    test('포인트 사용 시, 잔고가 부족하면 실패한다', async () => {
-      const point = new PointBody();
-      point.amount = 1000;
+    test.each([
+      { amount: 0, usePoint: 100 },
+      { amount: 100, usePoint: 101 },
+    ])(
+      '포인트가 $amount 만큼 있을 때, $usePoint 포인트를 사용하려고 하면 실패한다.',
+      async ({ amount, usePoint: usePoint }) => {
+        await userPointTable.insertOrUpdate(USER_ID, amount);
+        const point = createPointBody(usePoint);
 
-      const userPoint = await userPointTable.selectById(USER_ID);
+        const userPoint = await userPointTable.selectById(USER_ID);
 
-      expect(userPoint.point).toBe(0);
+        expect(userPoint.point).toBe(0);
 
-      await expect(controller.use(USER_ID, point)).rejects.toThrow(
-        new PointException('잔고가 부족합니다.'),
-      );
-    });
+        await expect(controller.use(USER_ID, point)).rejects.toThrow(
+          new PointException('잔고가 부족합니다.'),
+        );
+      },
+    );
+
+    // 포인트를 사용하는 값은 양의 정수여야 함
+    test.each([-100, 0, 0.1, -0.5, 'abc', null, undefined, [], {}, NaN])(
+      '유효하지 않은 포인트(%s)를 사용하려고 하면 실패한다.',
+      async (usePoint) => {
+        const point = createPointBody(usePoint as never);
+
+        await expect(controller.use(USER_ID, point)).rejects.toThrow(
+          new PointException('잔고가 부족합니다.'),
+        );
+      },
+    );
 
     test('포인트 사용 시, 잔고가 충분하면 성공한다', async () => {
       // USER_ID 유저의 포인트를 1000으로 설정
       await userPointTable.insertOrUpdate(USER_ID, 1000);
 
-      const point = new PointBody();
-      point.amount = 500;
+      const point = createPointBody(500);
 
       expect(await controller.use(USER_ID, point)).toEqual({
         id: USER_ID,
