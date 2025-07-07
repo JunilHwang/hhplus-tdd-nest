@@ -4,7 +4,7 @@ import { TransactionType } from './point.model';
 import { PointBody } from './point.dto';
 
 @Injectable()
-export class PointService {
+export class PointHistoryService {
   constructor(private readonly pointHistoryTable: PointHistoryTable) {}
 
   async getPointHistory(userId: number) {

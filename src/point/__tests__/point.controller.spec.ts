@@ -9,6 +9,8 @@ import {
   InvalidPointRequestException,
 } from '../point.error';
 import { TransactionType } from '../point.model';
+import { PointHistoryService } from '../point-history.service';
+import { PointFacade } from '../point.facade';
 
 const USER_ID = 1;
 
@@ -30,15 +32,23 @@ const createPointBody = (amount: number): PointBody => {
 describe('PointController > ', () => {
   let controller: PointController;
   let userPointTable: UserPointTable;
+  let pointHistoryTable: PointHistoryTable;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PointController],
-      providers: [PointService, UserPointTable, PointHistoryTable],
+      providers: [
+        PointFacade,
+        PointHistoryService,
+        PointService,
+        UserPointTable,
+        PointHistoryTable,
+      ],
     }).compile();
 
     controller = module.get(PointController);
     userPointTable = module.get(UserPointTable);
+    pointHistoryTable = module.get(PointHistoryTable);
   });
 
   describe('포인트 충전', () => {
@@ -151,13 +161,7 @@ describe('PointController > ', () => {
   });
 
   describe('포인트 내역 조회', () => {
-    test('포인트 내역이 없는 경우 빈 배열을 반환한다', async () => {
-      expect(await controller.history(USER_ID)).toEqual([]);
-    });
-
-    test('포인트 내역이 있는 경우 해당 내역을 반환한다', async () => {
-      // 포인트 내역을 추가
-      const pointHistoryTable = new PointHistoryTable();
+    beforeEach(async () => {
       await pointHistoryTable.insert(
         USER_ID,
         1000,
@@ -170,25 +174,29 @@ describe('PointController > ', () => {
         TransactionType.USE,
         Date.now(),
       );
+    });
+    test('포인트 내역이 없는 경우 빈 배열을 반환한다', async () => {
+      expect(await controller.history(2)).toEqual([]);
+    });
 
+    test('포인트 내역이 있는 경우 해당 내역을 반환한다', async () => {
       const histories = await controller.history(USER_ID);
-      expect(histories).toHaveLength(2);
-      expect(histories[0]).toEqual({
-        id: expect.any(Number),
-        userId: USER_ID,
-        amount: 1000,
-        type: 'charge',
-        timeMillis: expect.any(Number),
-      });
-      expect(histories[1]).toEqual({
-        id: expect.any(Number),
-        userId: USER_ID,
-        amount: -500,
-        type: 'use',
-        timeMillis: expect.any(Number),
-      });
+      expect(histories).toEqual([
+        {
+          id: expect.any(Number),
+          userId: USER_ID,
+          amount: 1000,
+          type: TransactionType.CHARGE,
+          timeMillis: expect.any(Number),
+        },
+        {
+          id: expect.any(Number),
+          userId: USER_ID,
+          amount: -500,
+          type: TransactionType.USE,
+          timeMillis: expect.any(Number),
+        },
+      ]);
     });
   });
-
-  describe('잔고가 관리', () => {});
 });
