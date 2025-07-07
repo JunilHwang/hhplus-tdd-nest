@@ -31,7 +31,7 @@
 
 ### 🚀Level-UP
 
-- [ ] 같은 사용자가 동시에 충전할 경우, 해당 요청 모두 정상적으로 반영되어야 합니다.
+- [X] 같은 사용자가 동시에 충전할 경우, 해당 요청 모두 정상적으로 반영되어야 합니다.
 
 ## 동시성 제어 방식 비교
 
@@ -119,3 +119,113 @@ async atomicUpdate(userId: number, updateFn: (current: number) => number) {
 
 현재 프로젝트 특성을 고려할 때 Queue 기반 방식이 적합하지 않을까?
 단순하고, 테스트 작성과 검증이 용이하고, 동시성 제어 개념 이해에 적합하고, 향후 실제 DB 환경으로 확장 시 다른 방식으로 변경 가능하다.
+
+## Queue 기반 동시성 제어 구현하기
+
+### `PointFacade.processWithQueue` 메서드 동작 원리
+
+```typescript
+private async processWithQueue<T>(
+  userId: number,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const currentQueue = this.userQueues.get(userId) ?? Promise.resolve();
+  const newQueue = currentQueue.then(async () => {
+    try {
+      return await operation();
+    } catch (error) {
+      throw error;
+    }
+  });
+  
+  this.userQueues.set(userId, newQueue);
+  return newQueue;
+}
+```
+
+```mermaid
+sequenceDiagram
+    participant Client1 as 클라이언트1
+    participant Client2 as 클라이언트2
+    participant Facade as PointFacade
+    participant Queue as UserQueue
+    participant Service as PointService
+    participant DB as UserPointTable
+
+    Note over Client1,Client2: 동시에 요청 발생
+    
+    Client1->>Facade: chargePoint(userId: 1, amount: 1000)
+    Client2->>Facade: chargePoint(userId: 1, amount: 2000)
+    
+    Facade->>Queue: processWithQueue(1, operation1)
+    Note over Queue: currentQueue = Promise.resolve()
+    Queue->>Queue: newQueue1 = currentQueue.then(operation1)
+    Queue->>Facade: userQueues.set(1, newQueue1)
+    
+    Facade->>Queue: processWithQueue(1, operation2)
+    Note over Queue: currentQueue = newQueue1
+    Queue->>Queue: newQueue2 = newQueue1.then(operation2)
+    Queue->>Facade: userQueues.set(1, newQueue2)
+    
+    par 순차 실행
+        Queue->>Service: operation1 시작
+        Service->>DB: selectById(1) -> point: 0
+        Service->>DB: insertOrUpdate(1, 0 + 1000)
+        DB-->>Service: {id: 1, point: 1000}
+        Service-->>Queue: operation1 완료
+        Queue-->>Client1: {id: 1, point: 1000}
+    and
+        Note over Queue: operation1 완료 후 operation2 시작
+        Queue->>Service: operation2 시작
+        Service->>DB: selectById(1) -> point: 1000
+        Service->>DB: insertOrUpdate(1, 1000 + 2000)
+        DB-->>Service: {id: 1, point: 3000}
+        Service-->>Queue: operation2 완료
+        Queue-->>Client2: {id: 1, point: 3000}
+    end
+```
+
+### 동작 흐름도
+
+```mermaid
+flowchart TD
+    A[요청 도착] --> B{해당 사용자 큐 존재?}
+    B -->|Yes| C[기존 큐 가져오기]
+    B -->|No| D[Promise.resolve로 빈 큐 생성]
+    
+    C --> E[currentQueue.then으로 새 작업 체인]
+    D --> E
+    
+    E --> F[새 큐를 Map에 저장]
+    F --> G[Promise 반환]
+    
+    G --> H[이전 작업 완료 대기]
+    H --> I[현재 작업 실행]
+    I --> J{작업 성공?}
+    
+    J -->|Yes| K[결과 반환]
+    J -->|No| L[에러 전파]
+    
+    K --> M[클라이언트에 응답]
+    L --> M
+```
+
+### 동시성 제어 예시
+
+```typescript
+// 동시에 3개 요청이 들어온 경우
+const promise1 = facade.chargePoint(1, 100);  // 즉시 실행
+const promise2 = facade.chargePoint(1, 200);  // promise1 완료 후 실행
+const promise3 = facade.chargePoint(1, 300);  // promise2 완료 후 실행
+
+// 실행 순서: 0 → 100 → 300 → 600
+await Promise.all([promise1, promise2, promise3]);
+```
+
+### 테스트 결과
+
+구현된 Queue 기반 동시성 제어는 다음과 같은 시나리오에서 모두 성공했습니다
+
+1. 기본 동시 충전: 1000 + 2000 = 3000 ✅
+2. 다중 동시 충전: 100 → 300 → 600 → 1000 → 1500 ✅
+3. 충전/사용 혼합: 1000 → 1500 → 1300 → 1600 → 1500 ✅
