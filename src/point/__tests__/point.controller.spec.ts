@@ -29,20 +29,21 @@ describe('PointController > ', () => {
   });
 
   describe('포인트 충전', () => {
-    test('음수 금액으로 충전을 시도하면 실패한다', async () => {
+    test.each([
+      ['음수 금액', -1000],
+      ['0원', 0],
+      ['소수점 금액', -0.5],
+      ['문자열 금액', 'abc'],
+      ['null 금액', null],
+      ['undefined 금액', undefined],
+    ])('%s으로 충전을 시도하면 실패한다', async (_, amount) => {
       const userId = 1;
-      const negativeAmount = -1000;
-      const pointDto: PointBody = { amount: negativeAmount };
+      const point = new PointBody();
+      point.amount = amount as never;
 
-      await expect(controller.charge(userId, pointDto)).rejects.toThrow();
-    });
-
-    test('0원 충전을 시도하면 실패한다', async () => {
-      const userId = 1;
-      const zeroAmount = 0;
-      const pointDto: PointBody = { amount: zeroAmount };
-
-      await expect(controller.charge(userId, pointDto)).rejects.toThrow();
+      expect(() => {
+        controller.charge(userId, point);
+      }).toThrow();
     });
   });
 
