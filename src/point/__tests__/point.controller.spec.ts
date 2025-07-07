@@ -220,5 +220,78 @@ describe('PointController > ', () => {
         updateMillis: expect.any(Number),
       });
     });
+
+    test('동시에 여러 충전 요청이 모두 정상적으로 처리되어야 한다', async () => {
+      const results = await Promise.all([
+        controller.charge(USER_ID, createPointBody(100)),
+        controller.charge(USER_ID, createPointBody(200)),
+        controller.charge(USER_ID, createPointBody(300)),
+        controller.charge(USER_ID, createPointBody(400)),
+        controller.charge(USER_ID, createPointBody(500)),
+      ]);
+
+      expect(results).toEqual([
+        {
+          id: USER_ID,
+          point: 100,
+          updateMillis: expect.any(Number),
+        },
+        {
+          id: USER_ID,
+          point: 300,
+          updateMillis: expect.any(Number),
+        },
+        {
+          id: USER_ID,
+          point: 600,
+          updateMillis: expect.any(Number),
+        },
+        {
+          id: USER_ID,
+          point: 1000,
+          updateMillis: expect.any(Number),
+        },
+        {
+          id: USER_ID,
+          point: 1500,
+          updateMillis: expect.any(Number),
+        },
+      ]);
+    });
+
+    test('충전과 사용이 동시에 일어나도 순차적으로 처리되어야 한다', async () => {
+      // 초기 포인트 설정
+      await userPointTable.insertOrUpdate(USER_ID, 1000);
+
+      const results = await Promise.all([
+        controller.charge(USER_ID, createPointBody(500)),
+        controller.use(USER_ID, createPointBody(200)),
+        controller.charge(USER_ID, createPointBody(300)),
+        controller.use(USER_ID, createPointBody(100)),
+      ]);
+
+      expect(results).toEqual([
+        {
+          id: USER_ID,
+          point: 1500,
+          updateMillis: expect.any(Number),
+        },
+        {
+          id: USER_ID,
+          point: 1300,
+          updateMillis: expect.any(Number),
+        },
+        {
+          id: USER_ID,
+          point: 1600,
+          updateMillis: expect.any(Number),
+        },
+        {
+          id: USER_ID,
+          point: 1500,
+          updateMillis: expect.any(Number),
+        },
+      ]);
+    });
   });
 });
