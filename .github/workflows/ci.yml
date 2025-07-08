@@ -30,3 +30,6 @@ jobs:
 
       - name: Run tests
         run: pnpm run test
+
+      - name: Run End To End tests
+        run: pnpm run test:e2e
