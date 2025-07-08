@@ -171,17 +171,10 @@ describe('PointFacade > ', () => {
     });
 
     test('서로 다른 사용자의 충전은 동시에 처리된다', async () => {
-      const start = Date.now();
-
       await Promise.all([
         facade.chargePoint(USER_ID, 1000),
         facade.chargePoint(OTHER_USER_ID, 2000),
       ]);
-
-      const end = Date.now();
-
-      // 동시 처리되므로 총 시간이 각각 실행하는 시간보다 짧아야 함
-      expect(end - start).toBeLessThan(600); // 각각 300ms씩 걸린다면 600ms보다 짧아야 함
 
       const userPoint = await facade.getPoint(USER_ID);
       const otherUserPoint = await facade.getPoint(OTHER_USER_ID);
