@@ -40,7 +40,7 @@ export class PointController {
     @Param('id') id,
     @Body(ValidationPipe) pointDto: PointDto,
   ): Promise<UserPoint> {
-    const userId = parseInt(id);
+    const userId = Number.parseInt(id);
     const amount = pointDto.amount;
     return await this.pointFacade.usePoint(userId, amount);
   }
