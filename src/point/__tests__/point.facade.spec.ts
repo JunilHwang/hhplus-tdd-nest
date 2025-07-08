@@ -5,6 +5,7 @@ import { PointHistoryService } from '../point-history.service';
 import { UserPointTable } from '../../database/userpoint.table';
 import { PointHistoryTable } from '../../database/pointhistory.table';
 import { TransactionType } from '../point.model';
+import { BadRequestException } from '@nestjs/common';
 
 const USER_ID = 1;
 const OTHER_USER_ID = 2;
@@ -33,6 +34,12 @@ describe('PointFacade > ', () => {
   describe('getPoint > ', () => {
     beforeEach(async () => {
       await userPointTable.insertOrUpdate(USER_ID, 1000);
+    });
+
+    test('잘못된 형식의 사용자 ID는 예외를 발생시킨다', async () => {
+      await expect(facade.getPoint(NaN)).rejects.toThrow(
+        new BadRequestException('올바르지 않은 ID 값 입니다.'),
+      );
     });
 
     test('사용자 포인트를 조회한다', async () => {

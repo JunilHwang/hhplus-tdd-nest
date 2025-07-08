@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PointService } from './point.service';
 import { PointHistoryService } from './point-history.service';
 
@@ -11,11 +11,24 @@ export class PointFacade {
     private readonly pointHistoryService: PointHistoryService,
   ) {}
 
+  #validateUserId(userId: number) {
+    if (
+      typeof userId !== 'number' ||
+      userId <= 0 ||
+      !Number.isInteger(userId) ||
+      isNaN(userId)
+    ) {
+      throw new BadRequestException('올바르지 않은 ID 값 입니다.');
+    }
+  }
+
   async getPoint(userId: number) {
+    this.#validateUserId(userId);
     return await this.pointService.getPoint(userId);
   }
 
   async getPointHistory(userId: number) {
+    this.#validateUserId(userId);
     return await this.pointHistoryService.getPointHistory(userId);
   }
 
@@ -38,6 +51,7 @@ export class PointFacade {
   }
 
   async chargePoint(userId: number, amount: number) {
+    this.#validateUserId(userId);
     return this.processWithQueue(userId, async () => {
       const point = await this.pointService.chargePoint(userId, amount);
       await this.pointHistoryService.chargePoint(userId, amount);
@@ -46,6 +60,7 @@ export class PointFacade {
   }
 
   async usePoint(userId: number, amount: number) {
+    this.#validateUserId(userId);
     return this.processWithQueue(userId, async () => {
       const point = await this.pointService.usePoint(userId, amount);
       await this.pointHistoryService.usePoint(userId, amount);

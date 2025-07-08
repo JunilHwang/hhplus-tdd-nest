@@ -16,7 +16,8 @@ export class PointController {
 
   @Get(':id')
   async point(@Param('id') id): Promise<UserPoint> {
-    return this.pointFacade.getPoint(parseInt(id));
+    const userId = Number.parseInt(id);
+    return this.pointFacade.getPoint(userId);
   }
 
   @Get(':id/histories')
@@ -30,7 +31,8 @@ export class PointController {
     @Param('id') id,
     @Body(ValidationPipe) pointDto: PointDto,
   ): Promise<UserPoint> {
-    return await this.pointFacade.chargePoint(id, pointDto.amount);
+    const userId = Number.parseInt(id);
+    return await this.pointFacade.chargePoint(userId, pointDto.amount);
   }
 
   @Patch(':id/use')
